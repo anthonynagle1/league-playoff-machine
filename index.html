@@ -223,7 +223,7 @@ function rootFor(t,gl){
     const baseH=100*nH[k]/N_SIM, cH=tot?100*hitH[k]/tot:baseH;
     let side,val,show,need=0,usual=0;
     if(!rare){side=pH>=pA?1:-1;val=Math.abs(pH-pA);show=val>=1}
-    else{side=cH>=baseH?1:-1;need=side===1?cH:100-cH;usual=side===1?baseH:100-baseH;val=need-usual;show=tot>0&&val>=5}
+    else{side=cH>=baseH?1:-1;need=side===1?cH:100-cH;usual=side===1?baseH:100-baseH;val=need-usual;show=tot>0&&val>=10&&need>=60}
     return {k,wk:g[0],h:g[1],a:g[2],pH,pA,side,val,show,need,usual,own:g[1]===t||g[2]===t}});
   cand.sort((x,y)=>y[0]-x[0]);
   return {p,rare,tot,games,cand:cand.slice(0,200)};
@@ -252,13 +252,13 @@ function drawRoot(){
     +(g0?`<p class="rnote" style="margin-top:-6px">Favorites win most of the runs, not all of them: ${T[fav].owner} wins the Week ${g0.wk} game in about ${fp}% of them.</p>`:"");
   const line=x=>{const win=x.side===1?x.h:x.a,lose=x.side===1?x.a:x.h;
     return ROOT.rare
-      ?`<div class="rl"><span class="wkn">Wk ${x.wk}</span><span><b>${T[win].owner}</b> over ${T[lose].owner} <span class="wkn">· usually ${Math.round(x.usual)}%</span></span><span class="sw">${Math.round(x.need)}%</span></div>`
+      ?`<div class="rl"><span class="wkn">Wk ${x.wk}</span><span><b>${T[win].owner}</b> over ${T[lose].owner}</span><span class="sw">${ROOT.tot<=500?Math.round(x.need*ROOT.tot/100)+" of "+ROOT.tot:Math.round(x.need)+"%"}<span class="wkn" style="display:block;font-weight:400">usually ${Math.round(x.usual)}%</span></span></div>`
       :`<div class="rl"><span class="wkn">Wk ${x.wk}</span><span><b>${T[win].owner}</b> over ${T[lose].owner}</span><span class="sw">+${x.val.toFixed(1)}</span></div>`};
   if(!ROOT.tot){h+=`<p class="rnote">This never happened in ${N_SIM.toLocaleString()} runs, so there's no scenario to show.</p>`;$("dream").disabled=true;box.innerHTML=h;return}
   const own2=ROOT.games.filter(x=>x.own&&(ROOT.rare?x.show:true)), oth2=ROOT.games.filter(x=>!x.own&&x.show).sort((x,y)=>(x.wk-y.wk)||(y.val-x.val));
   const meh2=ROOT.games.filter(x=>!x.own&&!x.show).length;
   if(ROOT.rare){
-    h+=`<p class="rnote">It happened in ${ROOT.tot.toLocaleString()} of ${N_SIM.toLocaleString()} runs. These are the results that showed up most in those runs, with how often each one came up there. "Usually" is how often it happens across all runs.</p>`;
+    h+=`<p class="rnote">It happened in only ${ROOT.tot.toLocaleString()} of ${N_SIM.toLocaleString()} runs, so here's what those runs had in common. The number on the right is how many of those ${ROOT.tot.toLocaleString()} runs had that result${ROOT.tot<=500?"":" (as a %)"}. "Usually" is how often that result happens across all runs. A result that shows up far more than usual has to happen for ${nm} to ${what}.</p>`;
     h+=`<div class="rgrp">${nm}'s own games</div>`+(own2.length?own2.map(line).join(""):'<p class="rnote">None of them stands out.</p>');
     h+=`<div class="rgrp">Other games</div>`+(oth2.length?oth2.map(line).join(""):'<p class="rnote">No other game stands out.</p>');
   }else{
