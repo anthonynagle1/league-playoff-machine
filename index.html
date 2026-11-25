@@ -122,6 +122,7 @@ tr.me td{background:var(--accent-soft)}
             </optgroup>
           </select>
           <button class="btn" id="dream" type="button" disabled>Fill in this scenario</button>
+          <span class="rnote" id="fillnote" aria-live="polite"></span>
         </div>
         <div id="rootlist"><p class="rnote">Choose a team to see which result helps it in every game, and by how much.</p></div>
       </section>
@@ -169,13 +170,14 @@ function rank(group,w,pf,H){
   return out;
 }
 const DIVS=[...new Set(T.map(t=>t.div))];
-function simulate(pk,keep){
+function simulate(pk,keep,n){
+  n=n||N_SIM;
   const rnd=mulberry32(20261125), made=new Float64Array(NT), bye=new Float64Array(NT), bot=new Float64Array(NT), sd=new Float64Array(NT), ws=new Float64Array(NT), one=new Float64Array(NT);
   const w0=T.map(t=>t.w), pf0=T.map(t=>t.pf), H0=new Int32Array(NT*NT);
   M.h2h.forEach((row,i)=>row.forEach((v,j)=>H0[i*NT+j]=v));
   const w=new Array(NT),pf=new Array(NT),H=new Int32Array(NT*NT);
-  const SEED=keep?new Uint8Array(N_SIM*NT):null, RES=keep?new Uint8Array(N_SIM*G.length):null;
-  for(let s=0;s<N_SIM;s++){
+  const SEED=keep?new Uint8Array(n*NT):null, RES=keep?new Uint8Array(n*G.length):null;
+  for(let s=0;s<n;s++){
     for(let i=0;i<NT;i++){w[i]=w0[i];pf[i]=pf0[i]}H.set(H0);
     for(let g=0;g<G.length;g++){
       const h=G[g][1],a=G[g][2];const [z1,z2]=normPair(rnd);
@@ -193,7 +195,7 @@ function simulate(pk,keep){
     order.forEach((x,k)=>{if(k<PO)made[x]++;if(k<2)bye[x]++;if(k>=NT-3)bot[x]++;sd[x]+=k+1;if(k===0)one[x]++;if(keep)SEED[s*NT+x]=k+1});
     for(let i=0;i<NT;i++)ws[i]+=w[i];
   }
-  const out=T.map((t,i)=>({i,po:100*made[i]/N_SIM,bye:100*bye[i]/N_SIM,one:100*one[i]/N_SIM,bot:100*bot[i]/N_SIM,seed:sd[i]/N_SIM,wins:ws[i]/N_SIM}));
+  const out=T.map((t,i)=>({i,po:100*made[i]/n,bye:100*bye[i]/n,one:100*one[i]/n,bot:100*bot[i]/n,seed:sd[i]/n,wins:ws[i]/n}));
   if(keep){out.SEED=SEED;out.RES=RES}
   return out;
 }
@@ -210,12 +212,29 @@ const GOAL={po:["make the playoffs",s=>s<=PO,"makes the playoffs"],bye:["win the
 // who should team t root for: one all-Sim run, then for each game the goal rate when home wins vs away wins
 function rootFor(t,gl){
   const ok=GOAL[gl][1], NG=G.length, hitH=new Float64Array(NG), nH=new Float64Array(NG), hitA=new Float64Array(NG), nA=new Float64Array(NG);
-  let tot=0;
+  const lp=G.map(g=>{const q=winProb(g[1],g[2]);return [Math.log(1-q),Math.log(q)]});
+  let tot=0; const cand=[];
   for(let s=0;s<N_SIM;s++){const hit=ok(ALL.SEED[s*NT+t])?1:0;tot+=hit;
-    for(let g=0;g<NG;g++){if(ALL.RES[s*NG+g]){nH[g]++;hitH[g]+=hit}else{nA[g]++;hitA[g]+=hit}}}
+    let ll=0;
+    for(let g=0;g<NG;g++){const r=ALL.RES[s*NG+g];if(r){nH[g]++;hitH[g]+=hit}else{nA[g]++;hitA[g]+=hit}if(hit)ll+=lp[g][r]}
+    if(hit)cand.push([ll,s])}
+  const p=100*tot/N_SIM, rare=p<50;
   const games=G.map((g,k)=>{const pH=nH[k]?100*hitH[k]/nH[k]:0,pA=nA[k]?100*hitA[k]/nA[k]:0;
-    return {k,wk:g[0],h:g[1],a:g[2],pH,pA,side:pH>=pA?1:-1,sw:Math.abs(pH-pA),own:g[1]===t||g[2]===t}});
-  return {p:100*tot/N_SIM,games};
+    const baseH=100*nH[k]/N_SIM, cH=tot?100*hitH[k]/tot:baseH;
+    let side,val,show,need=0,usual=0;
+    if(!rare){side=pH>=pA?1:-1;val=Math.abs(pH-pA);show=val>=1}
+    else{side=cH>=baseH?1:-1;need=side===1?cH:100-cH;usual=side===1?baseH:100-baseH;val=need-usual;show=tot>0&&val>=5}
+    return {k,wk:g[0],h:g[1],a:g[2],pH,pA,side,val,show,need,usual,own:g[1]===t||g[2]===t}});
+  cand.sort((x,y)=>y[0]-x[0]);
+  return {p,rare,tot,games,cand:cand.slice(0,60).map(c=>c[1])};
+}
+const RATE={po:r=>r.po,miss:r=>100-r.po,bye:r=>r.bye,nobye:r=>100-r.bye,one:r=>r.one,bot:r=>100-r.bot,tb:r=>r.bot};
+// most likely complete set of results in which the scenario really happens (checked on the board before use)
+function bestScenario(){
+  const NG=G.length;let first=null;
+  for(const s of ROOT.cand){const pk=G.map((g,k)=>ALL.RES[s*NG+k]?1:-1);if(!first)first=pk;
+    if(RATE[goal](simulate(pk,false,2000)[team])>=60)return pk}
+  return first;
 }
 function suggestGoal(t){const r=base?ALL[t]:null;if(!r)return"po";
   if(r.po>1&&r.po<99)return"po";if(r.po>=99)return r.bye<99?"bye":"one";return"bot"}
@@ -229,14 +248,25 @@ function drawRoot(){
   const g0=own[0], fav=g0?(winProb(g0.h,g0.a)>=0.5?g0.h:g0.a):-1, fp=g0?Math.round(100*Math.max(winProb(g0.h,g0.a),1-winProb(g0.h,g0.a))):0;
   let h=`<p class="rsum">${nm} ${GOAL[goal][2]} <b>${f(ROOT.p)}</b> of the time when every game plays out on its projected odds.</p>`
     +(g0?`<p class="rnote" style="margin-top:-6px">Favorites win most of the runs, not all of them: ${T[fav].owner} wins the Week ${g0.wk} game in about ${fp}% of them.</p>`:"");
-  h+=`<div class="rgrp">${nm}'s own games</div>`+own.map(x=>{const me=x.h===team?1:-1,opp=T[me===1?x.a:x.h].owner;
-      const w=me===1?x.pH:x.pA,l=me===1?x.pA:x.pH;
-      const pick=w>=l?nm:opp;
+  const line=x=>{const win=x.side===1?x.h:x.a,lose=x.side===1?x.a:x.h;
+    return ROOT.rare
+      ?`<div class="rl"><span class="wkn">Wk ${x.wk}</span><span><b>${T[win].owner}</b> over ${T[lose].owner} <span class="wkn">· usually ${Math.round(x.usual)}%</span></span><span class="sw">${Math.round(x.need)}%</span></div>`
+      :`<div class="rl"><span class="wkn">Wk ${x.wk}</span><span><b>${T[win].owner}</b> over ${T[lose].owner}</span><span class="sw">+${x.val.toFixed(1)}</span></div>`};
+  if(!ROOT.tot){h+=`<p class="rnote">This never happened in ${N_SIM.toLocaleString()} runs, so there's no scenario to show.</p>`;$("dream").disabled=true;box.innerHTML=h;return}
+  const own2=ROOT.games.filter(x=>x.own&&(ROOT.rare?x.show:true)), oth2=ROOT.games.filter(x=>!x.own&&x.show).sort((x,y)=>(x.wk-y.wk)||(y.val-x.val));
+  const meh2=ROOT.games.filter(x=>!x.own&&!x.show).length;
+  if(ROOT.rare){
+    h+=`<p class="rnote">It happened in ${ROOT.tot.toLocaleString()} of ${N_SIM.toLocaleString()} runs. These are the results that showed up most in those runs, with how often each one came up there. "Usually" is how often it happens across all runs.</p>`;
+    h+=`<div class="rgrp">${nm}'s own games</div>`+(own2.length?own2.map(line).join(""):'<p class="rnote">None of them stands out.</p>');
+    h+=`<div class="rgrp">Other games</div>`+(oth2.length?oth2.map(line).join(""):'<p class="rnote">No other game stands out.</p>');
+  }else{
+    h+=`<div class="rgrp">${nm}'s own games</div>`+own2.map(x=>{const me=x.h===team?1:-1,opp=T[me===1?x.a:x.h].owner;
+      const w=me===1?x.pH:x.pA,l=me===1?x.pA:x.pH,pick=w>=l?nm:opp;
       return `<div class="rl"><span class="wkn">Wk ${x.wk}</span><span>vs ${opp}: ${f(w)} if ${nm} wins, ${f(l)} if ${nm} loses</span><span class="sw">${Math.abs(w-l)>=0.5?"<b>"+pick+"</b> +"+Math.abs(w-l).toFixed(1):""}</span></div>`}).join("");
-  h+=`<div class="rgrp">Root for, in other games</div>`+(oth.length?oth.map(x=>{const win=x.side===1?x.h:x.a,lose=x.side===1?x.a:x.h;
-      return `<div class="rl"><span class="wkn">Wk ${x.wk}</span><span><b>${T[win].owner}</b> over ${T[lose].owner}</span><span class="sw">+${x.sw.toFixed(1)}</span></div>`}).join("")
-      :'<p class="rnote">No other game moves this by a point or more.</p>');
-  h+=`<p class="rnote">Numbers are how many points ${nm}'s chance to ${what} moves with that result, with every other game played out on its projected odds, so they don't change as you pick games below. ${meh?meh+" other game"+(meh>1?"s":"")+" move it by less than a point.":""} <b>Fill in this scenario</b> sets every game to the result that helps and shows it on the board.</p>`;
+    h+=`<div class="rgrp">Root for, in other games</div>`+(oth2.length?oth2.map(line).join(""):'<p class="rnote">No other game moves this by a point or more.</p>');
+    h+=`<p class="rnote">Numbers are how many points ${nm}'s chance to ${what} moves with that result, with every other game played out on its projected odds, so they don't change as you pick games below. ${meh2?meh2+" other game"+(meh2>1?"s":"")+" move it by less than a point.":""}</p>`;
+  }
+  h+=`<p class="rnote"><b>Fill in this scenario</b> sets all 15 games to the most likely set of results where it happens, and shows it on the board.</p>`;
   box.innerHTML=h;
 }
 function drawGames(){
@@ -249,7 +279,7 @@ function drawGames(){
       const rg=ROOT?ROOT.games[k]:null, mine=rg&&rg.own;
       const rt=(side)=>{if(!rg)return"";const t=side===1?h:a;let o="";
         if(mine&&t===team)o+=' <span class="tag you">'+T[team].owner.toUpperCase()+'</span>';
-        if(rg.side===side&&(mine?rg.sw>=0.5:rg.sw>=1))o+=' <span class="tag root">ROOT</span>';return o};
+        if(rg.side===side&&(rg.show||(mine&&!ROOT.rare&&rg.val>=0.5)))o+=' <span class="tag root">ROOT</span>';return o};
       return `<div class="game${mine?" mine":""}">
         <button class="pick ${cls(1)}" type="button" data-g="${k}" data-v="1" aria-pressed="${st===1}"><b>${T[h].owner}</b><small>${rec(h)} · wins ${Math.round(100*p)}%${up(1)}${rt(1)}</small></button>
         <button class="mid ${st===0?"on":""}" type="button" data-g="${k}" data-v="0" aria-pressed="${st===0}">Sim</button>
@@ -278,11 +308,13 @@ function run(){document.querySelector(".board").classList.add("busy");
   setTimeout(()=>{last=simulate(picks);drawBoard(last);document.querySelector(".board").classList.remove("busy")},10)}
 
 $("team").innerHTML+=T.map((t,i)=>[t.owner,i]).sort((a,b)=>a[0].localeCompare(b[0])).map(([n,i])=>`<option value="${i}">${n}</option>`).join("");
-$("team").addEventListener("change",e=>{team=e.target.value===""?-1:+e.target.value;if(team>=0){goal=suggestGoal(team);$("goal").value=goal}
+$("team").addEventListener("change",e=>{$("fillnote").textContent="";team=e.target.value===""?-1:+e.target.value;if(team>=0){goal=suggestGoal(team);$("goal").value=goal}
   drawRoot();drawGames();if(last)drawBoard(last)});
-$("goal").addEventListener("change",e=>{goal=e.target.value;drawRoot();drawGames()});
-$("dream").addEventListener("click",()=>{if(!ROOT)return;
-  ROOT.games.forEach(x=>{picks[x.k]=x.sw>=0.5?x.side:PROJ[x.k]});drawGames();run()});
+$("goal").addEventListener("change",e=>{$("fillnote").textContent="";goal=e.target.value;drawRoot();drawGames()});
+$("dream").addEventListener("click",()=>{if(!ROOT||!ROOT.tot)return;
+  const pk=bestScenario();if(!pk)return;pk.forEach((v,k)=>picks[k]=v);drawGames();run();
+  const up=pk.filter((v,k)=>v!==PROJ[k]).length;
+  $("fillnote").textContent=`Filled in: the most likely way ${T[team].owner} ${GOAL[goal][2].replace(/^(\S+)/,"$1")}. It takes ${up} upset${up===1?"":"s"}.`});
 $("games").addEventListener("click",e=>{const b=e.target.closest("button[data-g]");if(!b)return;
   const g=+b.dataset.g,v=+b.dataset.v;if(picks[g]===v)return;picks[g]=v;drawGames();run()});
 $("reset").addEventListener("click",()=>{PROJ.forEach((v,k)=>picks[k]=v);drawGames();run()});
