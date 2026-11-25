@@ -258,9 +258,14 @@ function drawRoot(){
   const own2=ROOT.games.filter(x=>x.own&&(ROOT.rare?x.show:true)), oth2=ROOT.games.filter(x=>!x.own&&x.show).sort((x,y)=>(x.wk-y.wk)||(y.val-x.val));
   const meh2=ROOT.games.filter(x=>!x.own&&!x.show).length;
   if(ROOT.rare){
-    h+=`<p class="rnote">It happened in only ${ROOT.tot.toLocaleString()} of ${N_SIM.toLocaleString()} runs, so here's what those runs had in common. The number on the right is how many of those ${ROOT.tot.toLocaleString()} runs had that result${ROOT.tot<=500?"":" (as a %)"}. "Usually" is how often that result happens across all runs. A result that shows up far more than usual has to happen for ${nm} to ${what}.</p>`;
-    h+=`<div class="rgrp">${nm}'s own games</div>`+(own2.length?own2.map(line).join(""):'<p class="rnote">None of them stands out.</p>');
-    h+=`<div class="rgrp">Other games</div>`+(oth2.length?oth2.map(line).join(""):'<p class="rnote">No other game stands out.</p>');
+    const all=ROOT.games.slice().sort((x,y)=>x.wk-y.wk||x.k-y.k);
+    const must=all.filter(x=>x.need>=95&&x.val>=10), helps=all.filter(x=>x.need<95&&x.show);
+    const item=x=>{const win=x.side===1?x.h:x.a,lose=x.side===1?x.a:x.h;
+      return `<div class="rl"><span class="wkn">Wk ${x.wk}</span><span><b>${T[win].owner}</b> beats ${T[lose].owner}</span><span></span></div>`};
+    h+=`<p class="rnote">This is a long shot: it happened in ${ROOT.tot.toLocaleString()} of ${N_SIM.toLocaleString()} runs. Here's what it takes.</p>`;
+    h+=`<div class="rgrp">Has to happen</div>`+(must.length?must.map(item).join(""):'<p class="rnote">No single result is required. It takes a mix of the ones below.</p>');
+    if(helps.length)h+=`<div class="rgrp">Usually happens too</div>`+helps.map(item).join("");
+    h+=`<p class="rnote">"Has to happen" was true in nearly every run where this happened. "Usually happens too" helps a lot but isn't required.</p>`;
   }else{
     h+=`<div class="rgrp">${nm}'s own games</div>`+own2.map(x=>{const me=x.h===team?1:-1,opp=T[me===1?x.a:x.h].owner;
       const w=me===1?x.pH:x.pA,l=me===1?x.pA:x.pH,pick=w>=l?nm:opp;
