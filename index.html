@@ -93,7 +93,7 @@ tr.me td{background:var(--accent-soft)}
   <div class="top">
     <div>
       <h1>The League Playoff Machine</h1>
-      <p class="lede">Every game starts on the projected winner, the team that wins it more often. Tap the other team to flip a result, or tap <b>Sim</b> to leave a game to chance. The odds update as you go.</p>
+      <p class="lede">Every game starts on the projected winner, the team that wins it more often. Tap the other team to flip a result, or tap <b>Sim</b> to play a game out on its projected odds. The odds update as you go.</p>
     </div>
     <div class="ctl">
       <button class="btn" id="reset" type="button">Reset to projected</button>
@@ -105,16 +105,23 @@ tr.me td{background:var(--accent-soft)}
     <div>
       <section class="rootbox" id="rootbox">
         <div class="rhead">
-          <label for="team">Root for</label>
+          <label for="team">Team</label>
           <select id="team"><option value="">Choose a team</option></select>
-          <label for="goal">Goal</label>
+          <label for="goal">Scenario</label>
           <select id="goal">
-            <option value="po">Make the playoffs</option>
-            <option value="bye">Win the division (bye)</option>
-            <option value="one">Get the 1 seed</option>
-            <option value="bot">Stay out of the toilet bowl</option>
+            <optgroup label="Rooting for them">
+              <option value="po">Make the playoffs</option>
+              <option value="bye">Win the division (bye)</option>
+              <option value="one">Get the 1 seed</option>
+              <option value="bot">Stay out of the toilet bowl</option>
+            </optgroup>
+            <optgroup label="Rooting against them">
+              <option value="miss">Miss the playoffs</option>
+              <option value="nobye">Miss the bye</option>
+              <option value="tb">Land in the toilet bowl</option>
+            </optgroup>
           </select>
-          <button class="btn" id="dream" type="button" disabled>Fill in best case</button>
+          <button class="btn" id="dream" type="button" disabled>Fill in this scenario</button>
         </div>
         <div id="rootlist"><p class="rnote">Choose a team to see which result helps it in every game, and by how much.</p></div>
       </section>
@@ -132,7 +139,7 @@ tr.me td{background:var(--accent-soft)}
 
   <section class="how">
     <h3>How this works</h3>
-    <p>Every game starts on the projected winner, the team that wins it more often. A picked game is locked in. A game on Sim is played out 20,000 times, with each team's score drawn from its roster's rest-of-season strength. A percentage is how often a team got there across all those runs. With every game picked, the only thing left to chance is points, which only matters when teams tie on record and head-to-head.</p>
+    <p>Every game starts on the projected winner, the team that wins it more often. A picked game is locked in. A game on Sim is played out 20,000 times on its projected odds, with each team's score drawn from its roster's rest-of-season strength. If Kal is a 71% favorite, he wins about 71% of those runs. A percentage is how often a team got there across all those runs. With every game picked, the only thing still open is points, which only matters when teams tie on record and head-to-head.</p>
     <p>Your spot depends on everyone else as much as on you, so flip other people's games too and watch the cutoff move. The small green and red numbers show how far each team moved from the projected setup.</p>
     <p>Seeding follows ESPN's rules for this league. The winner of each division gets seed 1 or 2 and a first-round bye, even with a worse record than a team in the other division. Everyone else is ranked by record. Ties go to head-to-head among the tied teams, then points for. Six teams make the playoffs, and seeds 8 to 10 play the toilet bowl. Records are through Week 11. Team strength comes from each roster's projected starters, not a coin flip, so favorites win more often.</p>
   </section>
@@ -196,7 +203,9 @@ let base=null, last=null, ALL=null, team=-1, goal="po", ROOT=null;
 const rec=i=>`${T[i].w}-${M.through-T[i].w}`;
 const f=x=>x>=99.95?"100%":x<=0.05?"0%":(x<1||x>99?x.toFixed(1):Math.round(x))+"%";
 const left=M.through+new Set(G.map(g=>g[0])).size;
-const GOAL={po:["make the playoffs",s=>s<=PO],bye:["win the division and the bye",s=>s<=2],one:["get the 1 seed",s=>s===1],bot:["stay out of the toilet bowl",s=>s<NT-2]};
+const GOAL={po:["make the playoffs",s=>s<=PO,"makes the playoffs"],bye:["win the division and the bye",s=>s<=2,"wins the division and the bye"],
+  one:["get the 1 seed",s=>s===1,"gets the 1 seed"],bot:["stay out of the toilet bowl",s=>s<NT-2,"stays out of the toilet bowl"],
+  miss:["miss the playoffs",s=>s>PO,"misses the playoffs"],nobye:["miss the bye",s=>s>2,"misses the bye"],tb:["land in the toilet bowl",s=>s>=NT-2,"lands in the toilet bowl"]};
 
 // who should team t root for: one all-Sim run, then for each game the goal rate when home wins vs away wins
 function rootFor(t,gl){
@@ -217,14 +226,17 @@ function drawRoot(){
   ROOT=rootFor(team,goal);const nm=T[team].owner, what=GOAL[goal][0];
   const own=ROOT.games.filter(x=>x.own), oth=ROOT.games.filter(x=>!x.own&&x.sw>=1).sort((x,y)=>(x.wk-y.wk)||(y.sw-x.sw));
   const meh=ROOT.games.filter(x=>!x.own&&x.sw<1).length;
-  let h=`<p class="rsum">${nm} ${goal==="bot"?"stays out of the toilet bowl":"gets there"} <b>${f(ROOT.p)}</b> of the time with every game left to chance.</p>`;
+  const g0=own[0], fav=g0?(winProb(g0.h,g0.a)>=0.5?g0.h:g0.a):-1, fp=g0?Math.round(100*Math.max(winProb(g0.h,g0.a),1-winProb(g0.h,g0.a))):0;
+  let h=`<p class="rsum">${nm} ${GOAL[goal][2]} <b>${f(ROOT.p)}</b> of the time when every game plays out on its projected odds.</p>`
+    +(g0?`<p class="rnote" style="margin-top:-6px">Favorites win most of the runs, not all of them: ${T[fav].owner} wins the Week ${g0.wk} game in about ${fp}% of them.</p>`:"");
   h+=`<div class="rgrp">${nm}'s own games</div>`+own.map(x=>{const me=x.h===team?1:-1,opp=T[me===1?x.a:x.h].owner;
       const w=me===1?x.pH:x.pA,l=me===1?x.pA:x.pH;
-      return `<div class="rl"><span class="wkn">Wk ${x.wk}</span><span>vs ${opp}: win ${f(w)}, lose ${f(l)}</span><span class="sw">${w-l>=0.5?"+"+(w-l).toFixed(1):""}</span></div>`}).join("");
-  h+=`<div class="rgrp">Root for</div>`+(oth.length?oth.map(x=>{const win=x.side===1?x.h:x.a,lose=x.side===1?x.a:x.h;
+      const pick=w>=l?nm:opp;
+      return `<div class="rl"><span class="wkn">Wk ${x.wk}</span><span>vs ${opp}: ${f(w)} if ${nm} wins, ${f(l)} if ${nm} loses</span><span class="sw">${Math.abs(w-l)>=0.5?"<b>"+pick+"</b> +"+Math.abs(w-l).toFixed(1):""}</span></div>`}).join("");
+  h+=`<div class="rgrp">Root for, in other games</div>`+(oth.length?oth.map(x=>{const win=x.side===1?x.h:x.a,lose=x.side===1?x.a:x.h;
       return `<div class="rl"><span class="wkn">Wk ${x.wk}</span><span><b>${T[win].owner}</b> over ${T[lose].owner}</span><span class="sw">+${x.sw.toFixed(1)}</span></div>`}).join("")
       :'<p class="rnote">No other game moves this by a point or more.</p>');
-  h+=`<p class="rnote">Numbers are how many points ${nm}'s chance to ${what} moves with that result, with every other game left to chance, so they don't change as you pick games below. ${meh?meh+" other game"+(meh>1?"s":"")+" move it by less than a point.":""} <b>Fill in best case</b> sets every game to the result that helps.</p>`;
+  h+=`<p class="rnote">Numbers are how many points ${nm}'s chance to ${what} moves with that result, with every other game played out on its projected odds, so they don't change as you pick games below. ${meh?meh+" other game"+(meh>1?"s":"")+" move it by less than a point.":""} <b>Fill in this scenario</b> sets every game to the result that helps and shows it on the board.</p>`;
   box.innerHTML=h;
 }
 function drawGames(){
@@ -235,7 +247,9 @@ function drawGames(){
       const cls=(side)=>st===0?"":(st===side?"on":"off");
       const up=(side)=>st===side&&PROJ[k]!==side?' <span class="tag up">UPSET</span>':"";
       const rg=ROOT?ROOT.games[k]:null, mine=rg&&rg.own;
-      const rt=(side)=>rg&&(mine?((side===1?h:a)===team):(rg.sw>=1&&rg.side===side))?` <span class="tag ${mine?"you":"root"}">${mine?"YOU":"ROOT"}</span>`:"";
+      const rt=(side)=>{if(!rg)return"";const t=side===1?h:a;let o="";
+        if(mine&&t===team)o+=' <span class="tag you">'+T[team].owner.toUpperCase()+'</span>';
+        if(rg.side===side&&(mine?rg.sw>=0.5:rg.sw>=1))o+=' <span class="tag root">ROOT</span>';return o};
       return `<div class="game${mine?" mine":""}">
         <button class="pick ${cls(1)}" type="button" data-g="${k}" data-v="1" aria-pressed="${st===1}"><b>${T[h].owner}</b><small>${rec(h)} · wins ${Math.round(100*p)}%${up(1)}${rt(1)}</small></button>
         <button class="mid ${st===0?"on":""}" type="button" data-g="${k}" data-v="0" aria-pressed="${st===0}">Sim</button>
@@ -268,7 +282,7 @@ $("team").addEventListener("change",e=>{team=e.target.value===""?-1:+e.target.va
   drawRoot();drawGames();if(last)drawBoard(last)});
 $("goal").addEventListener("change",e=>{goal=e.target.value;drawRoot();drawGames()});
 $("dream").addEventListener("click",()=>{if(!ROOT)return;
-  ROOT.games.forEach(x=>{picks[x.k]=x.own?(x.h===team?1:-1):(x.sw>=0.5?x.side:PROJ[x.k])});drawGames();run()});
+  ROOT.games.forEach(x=>{picks[x.k]=x.sw>=0.5?x.side:PROJ[x.k]});drawGames();run()});
 $("games").addEventListener("click",e=>{const b=e.target.closest("button[data-g]");if(!b)return;
   const g=+b.dataset.g,v=+b.dataset.v;if(picks[g]===v)return;picks[g]=v;drawGames();run()});
 $("reset").addEventListener("click",()=>{PROJ.forEach((v,k)=>picks[k]=v);drawGames();run()});
