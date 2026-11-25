@@ -140,15 +140,14 @@ tr.me td{background:var(--accent-soft)}
 
   <section class="how">
     <h3>How this works</h3>
-    <p>Every game starts on the projected winner, the team that wins it more often. A picked game is locked in. A game on Sim is played out 20,000 times on its projected odds, with each team's score drawn from its roster's rest-of-season strength. If Kal is a 71% favorite, he wins about 71% of those runs. A percentage is how often a team got there across all those runs. With every game picked, the only thing still open is points, which only matters when teams tie on record and head-to-head.</p>
+    <p>Every game starts on the projected winner, the team that wins it more often. A picked game is locked in. A game on Sim is played out 20,000 times on its projected odds, with each team's score drawn from its roster's rest-of-season strength. A team that's a 70% favorite wins about 70% of those runs. A percentage is how often a team got there across all those runs. With every game picked, the only thing still open is points, which only matters when teams tie on record and head-to-head.</p>
     <p>Your spot depends on everyone else as much as on you, so flip other people's games too and watch the cutoff move. The small green and red numbers show how far each team moved from the projected setup.</p>
     <p>Seeding follows ESPN's rules for this league. The winner of each division gets seed 1 or 2 and a first-round bye, even with a worse record than a team in the other division. Everyone else is ranked by record. Ties go to head-to-head among the tied teams, then points for. Six teams make the playoffs, and seeds 8 to 10 play the toilet bowl. Records are through Week 11. Team strength comes from each roster's projected starters, not a coin flip, so favorites win more often.</p>
   </section>
 </div>
 
 <script>
-const M = {"teams":[{"owner":"Kal","div":0,"w":7,"pf":1305.24,"mu":103.1,"sd":21.55},{"owner":"Andrew","div":1,"w":7,"pf":1236.15,"mu":92.5,"sd":20.13},{"owner":"Anthony","div":0,"w":6,"pf":1123.46,"mu":87.1,"sd":18.58},{"owner":"Brendan","div":0,"w":4,"pf":973.99,"mu":75.3,"sd":17.16},{"owner":"Colin","div":1,"w":4,"pf":993.33,"mu":82.5,"sd":18.07},{"owner":"Jack","div":0,"w":2,"pf":1034.78,"mu":82.4,"sd":18.18},{"owner":"William","div":0,"w":3,"pf":988.6,"mu":87.2,"sd":19.35},{"owner":"Ryan","div":1,"w":9,"pf":1205.61,"mu":97.2,"sd":20.86},{"owner":"Patrick","div":1,"w":7,"pf":1219.37,"mu":98.1,"sd":20.55},{"owner":"Alex","div":1,"w":6,"pf":1070.09,"mu":85.5,"sd":18.39}],"h2h":[[0,0,1,2,0,1,2,0,0,1],[1,0,1,1,2,1,1,0,0,0],[0,0,0,0,1,2,1,1,0,1],[0,0,1,0,0,1,1,1,0,0],[1,0,0,1,0,1,0,0,1,0],[1,0,0,0,0,0,1,0,0,0],[0,0,1,1,0,0,0,0,1,0],[0,1,0,0,2,1,1,0,2,2],[1,2,1,1,0,1,0,0,0,1],[0,1,0,1,2,1,1,0,0,0]],"fut":[[12,0,7],[12,2,3],[12,6,5],[12,8,4],[12,9,1],[13,0,2],[13,1,7],[13,5,3],[13,6,4],[13,9,8],[14,1,3],[14,4,2],[14,7,6],[14,8,0],[14,9,5]],"divs":{"0":"National Treasure 3","1":"Duffle Bag Boys??"},"through":11}
-;
+const M = {"teams":[{"owner":"Kal","div":0,"w":7,"pf":1305.24,"mu":103.1,"sd":21.55},{"owner":"Andrew","div":1,"w":7,"pf":1236.15,"mu":92.5,"sd":20.13},{"owner":"Anthony","div":0,"w":6,"pf":1123.46,"mu":87.1,"sd":18.58},{"owner":"Brendan","div":0,"w":4,"pf":973.99,"mu":75.3,"sd":17.16},{"owner":"Colin","div":1,"w":4,"pf":993.33,"mu":82.5,"sd":18.07},{"owner":"Jack","div":0,"w":2,"pf":1034.78,"mu":82.4,"sd":18.18},{"owner":"William","div":0,"w":3,"pf":988.6,"mu":87.2,"sd":19.35},{"owner":"Ryan","div":1,"w":9,"pf":1205.61,"mu":97.2,"sd":20.86},{"owner":"Patrick","div":1,"w":7,"pf":1219.37,"mu":98.1,"sd":20.55},{"owner":"Alex","div":1,"w":6,"pf":1070.09,"mu":85.5,"sd":18.39}],"tiebreak":"H2H","h2h":[[0,0,1,2,0,1,2,0,0,1],[1,0,1,1,2,1,1,0,0,0],[0,0,0,0,1,2,1,1,0,1],[0,0,1,0,0,1,1,1,0,0],[1,0,0,1,0,1,0,0,1,0],[1,0,0,0,0,0,1,0,0,0],[0,0,1,1,0,0,0,0,1,0],[0,1,0,0,2,1,1,0,2,2],[1,2,1,1,0,1,0,0,0,1],[0,1,0,1,2,1,1,0,0,0]],"fut":[[12,0,7],[12,2,3],[12,6,5],[12,8,4],[12,9,1],[13,0,2],[13,1,7],[13,5,3],[13,6,4],[13,9,8],[14,1,3],[14,4,2],[14,7,6],[14,8,0],[14,9,5]],"divs":{"0":"National Treasure 3","1":"Duffle Bag Boys??"},"through":11};
 const N_SIM = 20000, T = M.teams, NT = T.length, G = M.fut, PO = 6;
 const PROJ = G.map(g => winProb(g[1], g[2]) >= 0.5 ? 1 : -1);   // projected winner of each game
 const picks = PROJ.slice();   // 0 = sim, 1 = home wins, -1 = away wins
@@ -165,6 +164,7 @@ function rank(group,w,pf,H){
   const by=new Map();for(const x of group){if(!by.has(w[x]))by.set(w[x],[]);by.get(w[x]).push(x)}
   const out=[];for(const wv of [...by.keys()].sort((a,b)=>b-a)){const tied=by.get(wv);
     if(tied.length===1){out.push(tied[0]);continue}
+    if(M.tiebreak==="PF"){tied.sort((a,b)=>pf[b]-pf[a]);out.push(...tied);continue}
     const hp=x=>{let ww=0,ll=0;for(const y of tied){if(y!==x){ww+=H[x*NT+y];ll+=H[y*NT+x]}}return ww+ll?ww/(ww+ll):0.5};
     tied.sort((a,b)=>(hp(b)-hp(a))||(pf[b]-pf[a]));out.push(...tied)}
   return out;
@@ -226,15 +226,17 @@ function rootFor(t,gl){
     else{side=cH>=baseH?1:-1;need=side===1?cH:100-cH;usual=side===1?baseH:100-baseH;val=need-usual;show=tot>0&&val>=5}
     return {k,wk:g[0],h:g[1],a:g[2],pH,pA,side,val,show,need,usual,own:g[1]===t||g[2]===t}});
   cand.sort((x,y)=>y[0]-x[0]);
-  return {p,rare,tot,games,cand:cand.slice(0,60).map(c=>c[1])};
+  return {p,rare,tot,games,cand:cand.slice(0,200)};
 }
 const RATE={po:r=>r.po,miss:r=>100-r.po,bye:r=>r.bye,nobye:r=>100-r.bye,one:r=>r.one,bot:r=>100-r.bot,tb:r=>r.bot};
 // most likely complete set of results in which the scenario really happens (checked on the board before use)
 function bestScenario(){
-  const NG=G.length;let first=null;
-  for(const s of ROOT.cand){const pk=G.map((g,k)=>ALL.RES[s*NG+k]?1:-1);if(!first)first=pk;
-    if(RATE[goal](simulate(pk,false,2000)[team])>=60)return pk}
-  return first;
+  const NG=G.length;let best=null;
+  // score = how likely the results are x how surely the scenario then happens (points can still decide ties)
+  for(const [ll,s] of ROOT.cand){const pk=G.map((g,k)=>ALL.RES[s*NG+k]?1:-1);
+    const r=RATE[goal](simulate(pk,false,1000)[team]), sc=ll+Math.log(Math.max(r,0.1)/100);
+    if(!best||sc>best.sc)best={pk,rate:r,sc};if(r>=95&&best.rate>=95)break}
+  return best;
 }
 function suggestGoal(t){const r=base?ALL[t]:null;if(!r)return"po";
   if(r.po>1&&r.po<99)return"po";if(r.po>=99)return r.bye<99?"bye":"one";return"bot"}
@@ -312,9 +314,9 @@ $("team").addEventListener("change",e=>{$("fillnote").textContent="";team=e.targ
   drawRoot();drawGames();if(last)drawBoard(last)});
 $("goal").addEventListener("change",e=>{$("fillnote").textContent="";goal=e.target.value;drawRoot();drawGames()});
 $("dream").addEventListener("click",()=>{if(!ROOT||!ROOT.tot)return;
-  const pk=bestScenario();if(!pk)return;pk.forEach((v,k)=>picks[k]=v);drawGames();run();
+  const bs=bestScenario();if(!bs)return;const pk=bs.pk;pk.forEach((v,k)=>picks[k]=v);drawGames();run();
   const up=pk.filter((v,k)=>v!==PROJ[k]).length;
-  $("fillnote").textContent=`Filled in: the most likely way ${T[team].owner} ${GOAL[goal][2].replace(/^(\S+)/,"$1")}. It takes ${up} upset${up===1?"":"s"}.`});
+  $("fillnote").textContent=`Filled in: the most likely way ${T[team].owner} ${GOAL[goal][2].replace(/^(\S+)/,"$1")}. It takes ${up} upset${up===1?"":"s"}.`+(bs.rate<95?` Even then it comes down to points, so it happens ${Math.round(bs.rate)}% of the time.`:"")});
 $("games").addEventListener("click",e=>{const b=e.target.closest("button[data-g]");if(!b)return;
   const g=+b.dataset.g,v=+b.dataset.v;if(picks[g]===v)return;picks[g]=v;drawGames();run()});
 $("reset").addEventListener("click",()=>{PROJ.forEach((v,k)=>picks[k]=v);drawGames();run()});
